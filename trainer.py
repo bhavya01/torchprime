@@ -148,7 +148,7 @@ class Trainer:
         self.model = self._shard_model(model)
 
         # Set up optimizers
-        self.optimizer = AdamW(params=model.parameters(),
+        self.optimizer = AdamW(params=self.model.parameters(),
                                lr=args.learning_rate,
                                betas=(args.adam_beta1, args.adam_beta2),
                                eps=args.adam_epsilon)
