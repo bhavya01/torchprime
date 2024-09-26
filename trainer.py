@@ -143,10 +143,8 @@ class Trainer:
                     axis_names=("fsdp", "tensor")))
         logger.info(f"Logical mesh shape: {xs.get_global_mesh().shape()}")
         self.input_sharding_spec = xs.ShardingSpec(xs.get_global_mesh(),
-                                                   ("fsdp", None),
-                                                   minibatch=True)
+                                                   ("fsdp", None))
         self.model = self._shard_model(model)
-
         # Set up optimizers
         self.optimizer = AdamW(params=self.model.parameters(),
                                lr=args.learning_rate,
@@ -171,17 +169,13 @@ class Trainer:
         if self.train_dataset is None:
             raise ValueError("Trainer: training requires a train_dataset.")
 
-        num_replicas = xr.process_count()
-        sampler = torch.utils.data.DistributedSampler(
-            self.train_dataset,
-            num_replicas=num_replicas,
-            rank=xr.process_index())
+        sampler = torch.utils.data.RandomSampler(self.train_dataset)
         dataloader = DataLoader(
             self.train_dataset,
             # Data collator will default to DataCollatorWithPadding, so we change it.
             collate_fn=default_data_collator,
             # This is the host batch size.
-            batch_size=self.global_batch_size // num_replicas,
+            batch_size=self.global_batch_size,
             sampler=sampler,
             drop_last=True,
         )
