@@ -150,7 +150,7 @@ class Trainer:
                                lr=args.learning_rate,
                                betas=(args.adam_beta1, args.adam_beta2),
                                eps=args.adam_epsilon)
-        self._prime_optimizer()
+        # self._prime_optimizer()
 
         self.lr_scheduler = get_scheduler(name=args.lr_scheduler_type,
                                           optimizer=self.optimizer,
