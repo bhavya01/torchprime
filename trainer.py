@@ -161,10 +161,9 @@ class Trainer:
             raise ValueError("Trainer: training requires a train_dataset.")
 
         num_replicas = xr.process_count()
-        sampler = torch.utils.data.DistributedSampler(
-            self.train_dataset,
-            num_replicas=num_replicas,
-            rank=xr.process_index())
+        sampler = torch.utils.data.RandomSampler(
+        self.train_dataset, replacement=True, num_samples=int(1e10), generator=g
+        )   
         dataloader = DataLoader(
             self.train_dataset,
             # Data collator will default to DataCollatorWithPadding, so we change it.
@@ -247,8 +246,8 @@ class Trainer:
         for step in range(max_step):
             try:
                 batch = next(train_iterator)
-            except StopIteration:
-                logger.info("Dataloader StopIteration. Stopping training.")
+            except StopIteration as e:
+                logger.info(f"Dataloader StopIteration {e}. Stopping training.")
                 break
 
             # For logging step, we expcliity isolate this step from tracing and execution overlapping.
