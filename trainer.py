@@ -161,6 +161,8 @@ class Trainer:
             raise ValueError("Trainer: training requires a train_dataset.")
 
         num_replicas = xr.process_count()
+        g = torch.Generator()
+        g.manual_seed(xr.host_index())
         sampler = torch.utils.data.RandomSampler(
         self.train_dataset, replacement=True, num_samples=int(1e10), generator=g
         )   
