@@ -143,39 +143,34 @@ class Trainer:
                     axis_names=("fsdp", "tensor")))
         logger.info(f"Logical mesh shape: {xs.get_global_mesh().shape()}")
         self.input_sharding_spec = xs.ShardingSpec(xs.get_global_mesh(),
-                                                   ("fsdp", None))
+                                                   ("fsdp", None), minibatch=True)
         self.model = self._shard_model(model)
         # Set up optimizers
         self.optimizer = AdamW(params=self.model.parameters(),
                                lr=args.learning_rate,
                                betas=(args.adam_beta1, args.adam_beta2),
                                eps=args.adam_epsilon)
-        # self._prime_optimizer()
 
         self.lr_scheduler = get_scheduler(name=args.lr_scheduler_type,
                                           optimizer=self.optimizer,
                                           num_warmup_steps=args.warmup_steps,
                                           num_training_steps=args.max_steps)
 
-    def _prime_optimizer(self):
-        for group in self.optimizer.param_groups:
-            for p in group['params']:
-                p.grad = torch.zeros_like(p)
-                p.grad.requires_grad_(False)
-        self.optimizer.step()
-        xm.mark_step()
-
     def _get_train_dataloader(self):
         if self.train_dataset is None:
             raise ValueError("Trainer: training requires a train_dataset.")
 
-        sampler = torch.utils.data.RandomSampler(self.train_dataset)
+        num_replicas = xr.process_count()
+        sampler = torch.utils.data.DistributedSampler(
+            self.train_dataset,
+            num_replicas=num_replicas,
+            rank=xr.process_index())
         dataloader = DataLoader(
             self.train_dataset,
             # Data collator will default to DataCollatorWithPadding, so we change it.
             collate_fn=default_data_collator,
             # This is the host batch size.
-            batch_size=self.global_batch_size,
+            batch_size=self.global_batch_size // num_replicas,
             sampler=sampler,
             drop_last=True,
         )
@@ -326,58 +321,4 @@ def main():
     logger.info(
         f"Training new model from scratch - Total size={n_params} params")
 
-    # Set the model dtype to bfloat16
-    model = model.to(torch.bfloat16)
-
-    # Downloading and loading a dataset from the hub.
-    data = load_dataset(
-        data_args.dataset_name,
-        data_args.dataset_config_name,
-        cache_dir=model_args.cache_dir,
-    )["train"]
-    column_names = list(data.features)
-    data = data.map(lambda samples: tokenizer(samples["text"]),
-                    batched=True,
-                    remove_columns=column_names)
-
-    # Taken from run_clm.py. It's important to group texts evenly to avoid recompilations in TPU.
-    block_size = data_args.block_size
-
-    def group_texts(examples):
-        from itertools import chain
-        # Concatenate all texts.
-        concatenated_examples = {
-            k: list(chain(*examples[k]))
-            for k in examples.keys()
-        }
-        total_length = len(concatenated_examples[list(examples.keys())[0]])
-        # We drop the small remainder, and if the total_length < block_size  we exclude this batch and return an empty dict.
-        # We could add padding if the model supported it instead of this drop, you can customize this part to your needs.
-        total_length = (total_length // block_size) * block_size
-        # Split by chunks of max_len.
-        result = {
-            k:
-            [t[i:i + block_size] for i in range(0, total_length, block_size)]
-            for k, t in concatenated_examples.items()
-        }
-        result["labels"] = result["input_ids"].copy()
-        return result
-
-    data = data.map(group_texts, batched=True)
-
-    trainer = Trainer(
-        model=model,
-        args=training_args,
-        train_dataset=data,
-    )
-
-    trainer.train_loop()
-
-
-if __name__ == "__main__":
-    logging.basicConfig(
-        format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
-        datefmt="%m/%d/%Y %H:%M:%S",
-        handlers=[logging.StreamHandler(sys.stdout)],
-    )
-    main()
+    # Set the model d
