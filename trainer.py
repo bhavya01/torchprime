@@ -255,10 +255,13 @@ class Trainer:
                 xm.wait_device_ops()
             trace_start_time = timer()
 
-            outputs = self.model(**batch)
+            with xp.Trace("model.forward"):
+                outputs = self.model(**batch)
             loss = outputs.loss
-            loss.backward()
-            self.optimizer.step()
+            with xp.Trace("model.backward"):
+                loss.backward()
+            with xp.Trace("optimizer.step"):
+                self.optimizer.step()
             self.lr_scheduler.step()
             self.model.zero_grad()
             xm.mark_step()
