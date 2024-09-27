@@ -248,6 +248,7 @@ class Trainer:
             try:
                 batch = next(train_iterator)
             except StopIteration:
+                logger.info("Dataloader StopIteration. Stopping training.")
                 break
 
             # For logging step, we expcliity isolate this step from tracing and execution overlapping.
