@@ -233,6 +233,14 @@ class Trainer:
 
         return model
 
+    def training_step(self, batch):
+        with xp.Trace("model.forward"):
+            outputs = self.model(**batch)
+            loss = outputs.loss
+        with xp.Trace("model.backward"):
+            loss.backward()
+        return loss
+
     def train_loop(self):
         self.model.train()
         self.model.zero_grad()
@@ -257,11 +265,7 @@ class Trainer:
                 xm.wait_device_ops()
             trace_start_time = timer()
 
-            with xp.Trace("model.forward"):
-                outputs = self.model(**batch)
-            loss = outputs.loss
-            with xp.Trace("model.backward"):
-                loss.backward()
+            loss = self.training_step(batch)
             with xp.Trace("optimizer.step"):
                 self.optimizer.step()
             self.lr_scheduler.step()
