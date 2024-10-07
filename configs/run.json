@@ -8,7 +8,7 @@
     "fsdp_config": "./configs/fsdp_config.json",
     "max_steps": 15,
     "profile_step": 5,
-    "model_id": "meta-llama/Meta-Llama-3-8B",
+    "model_id": "./configs/llama_3_8b.json",
     "tokenizer_name": "meta-llama/Meta-Llama-3-8B",
     "block_size": 8192
 }
