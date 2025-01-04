@@ -204,6 +204,8 @@ class LlamaAttention(nn.Module):
         self.o_proj = nn.Linear(self.hidden_size,
                                 self.hidden_size,
                                 bias=config.attention_bias)
+        self.layer_norm_key = nn.LayerNorm(self.head_dim)
+        self.layer_norm_query = nn.LayerNorm(self.head_dim)
         self._init_rope()
 
     def _init_rope(self):
@@ -239,6 +241,9 @@ class LlamaAttention(nn.Module):
 
         key_states = repeat_kv(key_states, self.num_key_value_groups)
         value_states = repeat_kv(value_states, self.num_key_value_groups)
+
+        query_states = self.layer_norm_query(query_states)
+        key_states = self.layer_norm_key(key_states)
 
         if not self.config.flash_attention:
             attn_weights = torch.matmul(query_states, key_states.transpose(
